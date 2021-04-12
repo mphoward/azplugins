@@ -210,9 +210,12 @@ class hertz(hoomd.md.pair.pair):
     :py:class:`hertz` is the Hertz potential:
 
     .. math::
+        :nowrap:
 
-        V(r)  &= \varepsilon \left(1-\frac{r}{r_{\rm cut}}\right)^{5/2},& r < r_{\rm cut} \\
-              &= 0,& r \ge r_{\mathrm{cut}}
+        \begin{eqnarray*}
+        V(r)  &= \varepsilon ( 1-\frac{ r }{ r_{\rm{cut}} } )^{5/2} ,& r < r_{\rm{cut}} \\
+              &= 0,& r \ge r_{\rm{cut}}
+        \end{eqnarray*}
 
     parameters :math:`\varepsilon`, the energy scale of the pair interaction.
     See :py:class:`hoomd.md.pair.pair` for details on how forces are calculated
