@@ -673,12 +673,16 @@ class FlowProfiler:
         hoomd.analyze.callback(f, period=1e3)
         hoomd.run(1e4)
         if hoomd.comm.get_rank() == 0:
-            np.savetxt('profiles.dat', np.column_stack((f.centers, f.density, f.velocity)))
+            np.savetxt('profiles.dat', np.column_stack((f.centers, f.density, f.velocity, f.temperature)))
 
     .. note::
 
         In MPI simulations, the profiles are **only** valid on the root rank. Accessing them on
         other ranks will produce an error.
+
+    .. note::
+
+        The temperature profile is calculated from the velocity values without substracting any shear flow.
 
     """
     def __init__(self, system, bin_axis, flow_axis, bins, range, area=1.):
@@ -725,6 +729,20 @@ class FlowProfiler:
             _velocity,_ = np.histogram(x, bins=self.bins, range=self.range, weights=v)
             self._velocity += _velocity
 
+            # temperature histogram
+            _temperature = np.zeros(len(self.centers))
+            for i,c in enumerate(self.centers):
+                slab_vel = snap.particles.velocity[np.abs(x-c)<0.5*self._dx[i]]
+                slab_mass = snap.particles.mass[np.abs(x-c)<0.5*self._dx[i]]
+                if len(slab_vel)>0:
+                    v_squared = np.sum(slab_vel**2)
+                    T = np.average(slab_mass*v_squared)/3.0
+                else:
+                    T=0
+                _temperature[i]=T
+
+            self._temperature += _temperature
+
             self.samples += 1
 
     def reset(self):
@@ -732,6 +750,7 @@ class FlowProfiler:
         self.samples = 0
         self._counts = np.zeros(self.bins)
         self._velocity = np.zeros(self.bins)
+        self._temperature = np.zeros(self.bins)
 
     @property
     def density(self):
@@ -754,5 +773,17 @@ class FlowProfiler:
 
         if self.samples > 0:
             return np.divide(self._velocity, self._counts, out=np.zeros(self.bins), where=self._counts > 0)
+        else:
+            return np.zeros(self.bins)
+
+    @property
+    def temperature(self):
+        r"""The current average temperature profile."""
+        if hoomd.comm.get_rank() != 0:
+            hoomd.context.msg.error('Flow profile only defined on root rank.\n')
+            raise RuntimeError('Flow profile only defined on root rank')
+
+        if self.samples > 0:
+            return np.divide(self._temperature, self._counts, out=np.zeros(self.bins), where=self._counts > 0)/self.samples
         else:
             return np.zeros(self.bins)
